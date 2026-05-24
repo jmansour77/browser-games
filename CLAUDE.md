@@ -21,13 +21,33 @@ No server required. No install step. No compilation.
 
 ## Git workflow
 
-Every meaningful change should be committed and pushed. The remote is `https://github.com/jmansour77/browser-games` (branch `main`). Credentials are stored in Windows Credential Manager — `git push` works without re-authentication.
+**Commit and push after every meaningful change.** This is non-negotiable — the goal is that no work is ever lost and any state can be recovered from GitHub. The remote is `https://github.com/jmansour77/browser-games` (branch `main`). Credentials are stored in Windows Credential Manager — `git push` works without re-authentication.
 
 ```bash
-git add shooter.html          # or tictactoe.html
-git commit -m "feat: ..."
+git add shooter.html          # stage only the file(s) changed
+git commit -m "feat: ..."     # see commit message conventions below
 git push
 ```
+
+### When to commit
+
+Commit at each of these milestones without waiting to be asked:
+- After adding a new feature or mechanic (even if small)
+- After fixing a bug
+- After any visual or gameplay tuning
+- Before starting a risky or experimental change (so there's a safe rollback point)
+
+### Commit message conventions
+
+Use the prefix that matches the change:
+- `feat:` — new feature or mechanic
+- `fix:` — bug fix
+- `style:` — visual / UI change with no logic impact
+- `balance:` — tuning numbers (enemy speed, damage, wave counts)
+- `docs:` — CLAUDE.md or other documentation only
+- `refactor:` — restructuring with no behavior change
+
+Keep the subject line under 72 characters. Add a short body if the *why* is non-obvious.
 
 ## shooter.html architecture
 

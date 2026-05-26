@@ -1,12 +1,13 @@
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');
 
 const PORT = 8081;
 const DIR = __dirname;
 const MEETINGS_FILE = path.join(DIR, 'meetings-data.json');
 const TEAMMATES_FILE = path.join(DIR, 'teammates.json');
+const SETTINGS_FILE = path.join(DIR, 'kanban-settings.json');
 
 const DEFAULT_TEAMMATES = {
   teammates: [{ id: 'tm-default', name: 'Jaffar H A', email: 'madojamas@gmail.com', asanaGid: '1215117503723367' }]
@@ -30,41 +31,46 @@ function readBody(req) {
   });
 }
 
-function spawnClaude(prompt) {
-  return new Promise((resolve, reject) => {
-    const proc = spawn('claude', ['--print', '--output-format', 'text', prompt], {
-      shell: true, cwd: DIR, env: process.env
-    });
-    let out = '', err = '';
-    proc.stdout.on('data', d => out += d.toString());
-    proc.stderr.on('data', d => err += d.toString());
-    proc.on('close', code => code !== 0 ? reject(new Error(err || `exit ${code}`)) : resolve(out.trim()));
-    proc.on('error', reject);
-    setTimeout(() => { proc.kill(); reject(new Error('claude spawn timed out after 120s')); }, 120000);
-  });
-}
-
-function extractJSON(text) {
-  try { return JSON.parse(text); } catch {}
-  const s = text.search(/[\[{]/);
-  const e = Math.max(text.lastIndexOf('}'), text.lastIndexOf(']'));
-  if (s !== -1 && e !== -1) {
-    try { return JSON.parse(text.slice(s, e + 1)); } catch {}
-  }
-  throw new Error('No JSON found in output: ' + text.slice(0, 300));
-}
-
 function json(res, data, status = 200) {
   res.writeHead(status, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
   res.end(JSON.stringify(data));
 }
 
+function asanaRequest(method, path, body, pat) {
+  return new Promise((resolve, reject) => {
+    const payload = body ? JSON.stringify(body) : null;
+    const options = {
+      hostname: 'app.asana.com',
+      path: `/api/1.0${path}`,
+      method,
+      headers: {
+        'Authorization': `Bearer ${pat}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {})
+      }
+    };
+    const req = https.request(options, res => {
+      let data = '';
+      res.on('data', chunk => data += chunk);
+      res.on('end', () => {
+        try {
+          const parsed = JSON.parse(data);
+          if (res.statusCode >= 400) reject(new Error(`Asana ${res.statusCode}: ${JSON.stringify(parsed.errors || parsed)}`));
+          else resolve(parsed);
+        } catch { reject(new Error(`Asana response parse error: ${data.slice(0, 200)}`)); }
+      });
+    });
+    req.on('error', reject);
+    if (payload) req.write(payload);
+    req.end();
+  });
+}
+
 function mergeActionItems(newMeetings, existingMeetings) {
   const existingMap = {};
   for (const m of (existingMeetings || [])) {
-    for (const ai of (m.actionItems || [])) {
-      existingMap[ai.id] = ai;
-    }
+    for (const ai of (m.actionItems || [])) existingMap[ai.id] = ai;
   }
   for (const m of newMeetings) {
     for (const ai of (m.actionItems || [])) {
@@ -80,17 +86,6 @@ function mergeActionItems(newMeetings, existingMeetings) {
   return newMeetings;
 }
 
-const GRANOLA_SYNC_PROMPT = `Use the Granola MCP to pull meeting notes and extract action items. Follow these steps exactly:
-
-1. Call list_meetings with time_range "last_30_days" to get all recent meetings.
-2. For each meeting returned, call get_meetings (passing the meeting IDs) to retrieve full notes and content.
-3. From each meeting's notes, extract action items. An action item is any of: a bullet point starting with a verb, a sentence containing words like 'will', 'should', 'need to', 'needs to', 'follow up', 'action:', 'TODO', 'next step', or an @mention of a person with a task. Focus on concrete tasks, not discussion points.
-4. Return ONLY a raw JSON object (no markdown fences, no explanation, no preamble). The JSON must exactly match this schema:
-
-{"syncedAt":"<ISO timestamp now>","meetings":[{"id":"<meeting id>","title":"<meeting title>","date":"<meeting date ISO>","actionItems":[{"id":"<meetingId>-ai-<0-based index>","text":"<action item text>","meetingId":"<meeting id>","meetingTitle":"<meeting title>","meetingDate":"<meeting date ISO>","assigneeId":null,"status":"unassigned","asanaTaskGid":null,"pushedAt":null}]}]}
-
-Return only the raw JSON. Nothing else.`;
-
 const server = http.createServer(async (req, res) => {
   const url = req.url.split('?')[0];
   const route = `${req.method} ${url}`;
@@ -101,44 +96,34 @@ const server = http.createServer(async (req, res) => {
   }
 
   try {
+    // ── Static ──────────────────────────────────────────────────────────────
     if (route === 'GET /') {
       const html = fs.readFileSync(path.join(DIR, 'kanban.html'), 'utf8');
       res.writeHead(200, { 'Content-Type': 'text/html' });
       return res.end(html);
     }
 
+    // ── Meetings ─────────────────────────────────────────────────────────────
     if (route === 'GET /api/meetings') {
-      const data = readJSON(MEETINGS_FILE, { meetings: [], syncedAt: null });
-      return json(res, data);
+      return json(res, readJSON(MEETINGS_FILE, { meetings: [], syncedAt: null }));
     }
 
-    if (route === 'POST /api/granola/sync') {
-      console.log('[granola] spawning claude to sync meetings...');
-      let rawOutput;
-      try {
-        rawOutput = await spawnClaude(GRANOLA_SYNC_PROMPT);
-      } catch (err) {
-        console.error('[granola] claude spawn failed:', err.message);
-        return json(res, { success: false, error: err.message }, 500);
-      }
-      let parsed;
-      try {
-        parsed = extractJSON(rawOutput);
-      } catch (err) {
-        console.error('[granola] JSON parse failed. Raw output:', rawOutput.slice(0, 500));
-        return json(res, { success: false, error: 'Could not parse response from Claude', debugOutput: rawOutput.slice(0, 1000) }, 500);
-      }
+    // Called by Claude (in the Code session) after pulling from Granola MCP
+    if (route === 'POST /api/granola/write') {
+      const body = await readBody(req);
+      if (!body.meetings) return json(res, { success: false, error: 'meetings array required' }, 400);
       const existing = readJSON(MEETINGS_FILE, { meetings: [] });
-      parsed.meetings = mergeActionItems(parsed.meetings || [], existing.meetings);
-      writeJSON(MEETINGS_FILE, parsed);
-      const actionItemCount = (parsed.meetings || []).reduce((sum, m) => sum + (m.actionItems || []).length, 0);
-      console.log(`[granola] synced ${parsed.meetings.length} meetings, ${actionItemCount} action items`);
-      return json(res, { success: true, meetingCount: parsed.meetings.length, actionItemCount });
+      body.meetings = mergeActionItems(body.meetings, existing.meetings);
+      body.syncedAt = body.syncedAt || new Date().toISOString();
+      writeJSON(MEETINGS_FILE, body);
+      const count = body.meetings.reduce((s, m) => s + (m.actionItems || []).length, 0);
+      console.log(`[granola] wrote ${body.meetings.length} meetings, ${count} action items`);
+      return json(res, { success: true, meetingCount: body.meetings.length, actionItemCount: count });
     }
 
+    // ── Teammates ────────────────────────────────────────────────────────────
     if (route === 'GET /api/teammates') {
-      const data = readJSON(TEAMMATES_FILE, DEFAULT_TEAMMATES);
-      return json(res, data);
+      return json(res, readJSON(TEAMMATES_FILE, DEFAULT_TEAMMATES));
     }
 
     if (route === 'POST /api/teammates') {
@@ -148,6 +133,7 @@ const server = http.createServer(async (req, res) => {
       return json(res, { success: true });
     }
 
+    // ── Action item patch ────────────────────────────────────────────────────
     if (route === 'POST /api/meetings/item') {
       const body = await readBody(req);
       if (!body.id || !body.patch) return json(res, { success: false, error: 'id and patch required' }, 400);
@@ -155,11 +141,7 @@ const server = http.createServer(async (req, res) => {
       let found = false;
       for (const m of (data.meetings || [])) {
         for (const ai of (m.actionItems || [])) {
-          if (ai.id === body.id) {
-            Object.assign(ai, body.patch);
-            found = true;
-            break;
-          }
+          if (ai.id === body.id) { Object.assign(ai, body.patch); found = true; break; }
         }
         if (found) break;
       }
@@ -168,71 +150,71 @@ const server = http.createServer(async (req, res) => {
       return json(res, { success: true });
     }
 
+    // ── Settings ─────────────────────────────────────────────────────────────
+    if (route === 'GET /api/settings') {
+      const s = readJSON(SETTINGS_FILE, {});
+      // Never expose the full PAT — just confirm whether it's set
+      return json(res, { hasAsanaPat: !!s.asanaPat, asanaPatPreview: s.asanaPat ? `...${s.asanaPat.slice(-4)}` : null });
+    }
+
+    if (route === 'POST /api/settings') {
+      const body = await readBody(req);
+      const current = readJSON(SETTINGS_FILE, {});
+      if (body.asanaPat !== undefined) current.asanaPat = body.asanaPat;
+      writeJSON(SETTINGS_FILE, current);
+      return json(res, { success: true });
+    }
+
+    // ── Asana push (REST API) ─────────────────────────────────────────────────
     if (route === 'POST /api/asana/push') {
       const body = await readBody(req);
       const { actionItemIds, projectGid } = body;
       if (!Array.isArray(actionItemIds) || !projectGid) {
         return json(res, { success: false, error: 'actionItemIds and projectGid required' }, 400);
       }
+
+      const settings = readJSON(SETTINGS_FILE, {});
+      if (!settings.asanaPat) {
+        return json(res, { success: false, error: 'NO_PAT', message: 'Asana Personal Access Token not configured. Open Settings to add it.' }, 400);
+      }
+
       const meetingsData = readJSON(MEETINGS_FILE, { meetings: [] });
       const teammatesData = readJSON(TEAMMATES_FILE, DEFAULT_TEAMMATES);
       const teammateMap = {};
       for (const t of teammatesData.teammates) teammateMap[t.id] = t;
 
-      const itemsToCreate = [];
+      const pushed = [];
+      const failed = [];
+      const now = new Date().toISOString();
+
       for (const m of meetingsData.meetings) {
         for (const ai of (m.actionItems || [])) {
-          if (actionItemIds.includes(ai.id)) {
-            const assignee = teammateMap[ai.assigneeId];
-            itemsToCreate.push({
-              actionItemId: ai.id,
+          if (!actionItemIds.includes(ai.id)) continue;
+          const assignee = teammateMap[ai.assigneeId];
+          const taskBody = {
+            data: {
               name: ai.text,
-              assigneeGid: assignee ? (assignee.asanaGid || null) : null,
-              notes: `From meeting: ${ai.meetingTitle} on ${ai.meetingDate ? new Date(ai.meetingDate).toLocaleDateString() : 'unknown date'}`
-            });
-          }
-        }
-      }
-
-      if (itemsToCreate.length === 0) return json(res, { success: false, error: 'No matching action items found' }, 400);
-
-      const tasksJSON = JSON.stringify(itemsToCreate);
-      const asanaPrompt = `Use the Asana MCP create_tasks tool to create tasks in Asana project GID ${projectGid}. Create one task per item in the array below. For each task use: name from "name" field, assignee from "assigneeGid" (null means unassigned), notes from "notes" field, and project_id "${projectGid}". After ALL tasks are created, return ONLY a raw JSON array (no markdown, no explanation) in this exact format: [{"actionItemId":"<id>","asanaTaskGid":"<created task gid>","success":true}]. One object per task. Tasks to create: ${tasksJSON}`;
-
-      console.log(`[asana] spawning claude to push ${itemsToCreate.length} tasks...`);
-      let rawOutput;
-      try {
-        rawOutput = await spawnClaude(asanaPrompt);
-      } catch (err) {
-        return json(res, { success: false, error: err.message }, 500);
-      }
-      let results;
-      try {
-        results = extractJSON(rawOutput);
-      } catch (err) {
-        return json(res, { success: false, error: 'Could not parse Asana response', debugOutput: rawOutput.slice(0, 1000) }, 500);
-      }
-      if (!Array.isArray(results)) results = [results];
-
-      const pushed = [];
-      const now = new Date().toISOString();
-      for (const r of results) {
-        if (r.success) {
-          for (const m of meetingsData.meetings) {
-            for (const ai of (m.actionItems || [])) {
-              if (ai.id === r.actionItemId) {
-                ai.status = 'pushed';
-                ai.asanaTaskGid = r.asanaTaskGid;
-                ai.pushedAt = now;
-                pushed.push({ actionItemId: ai.id, asanaTaskGid: r.asanaTaskGid });
-              }
+              projects: [projectGid],
+              notes: `From meeting: ${ai.meetingTitle} on ${ai.meetingDate ? new Date(ai.meetingDate).toLocaleDateString() : 'unknown'}`,
+              ...(assignee?.asanaGid ? { assignee: assignee.asanaGid } : {})
             }
+          };
+          try {
+            const result = await asanaRequest('POST', '/tasks', taskBody, settings.asanaPat);
+            ai.status = 'pushed';
+            ai.asanaTaskGid = result.data.gid;
+            ai.pushedAt = now;
+            pushed.push({ actionItemId: ai.id, asanaTaskGid: result.data.gid });
+            console.log(`[asana] created task "${ai.text.slice(0, 40)}" → ${result.data.gid}`);
+          } catch (err) {
+            console.error(`[asana] failed to create task "${ai.text.slice(0, 40)}":`, err.message);
+            failed.push({ actionItemId: ai.id, error: err.message });
           }
         }
       }
+
       writeJSON(MEETINGS_FILE, meetingsData);
-      console.log(`[asana] pushed ${pushed.length} tasks`);
-      return json(res, { success: true, pushed });
+      return json(res, { success: true, pushed, failed });
     }
 
     res.writeHead(404, { 'Content-Type': 'text/plain' });
@@ -245,5 +227,4 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`Kanban server running at http://localhost:${PORT}`);
-  console.log(`Open http://localhost:${PORT} in your browser`);
 });

@@ -360,8 +360,6 @@
     backdrop-filter: blur(2px);
   }
   #modal-overlay.hidden { display: none; }
-  #settings-overlay { display: flex; }
-  #settings-overlay.hidden { display: none; }
   #modal {
     background: #1a1d27;
     border: 1px solid var(--card-border);
@@ -443,7 +441,6 @@
   <div class="topbar-right">
     <span id="sync-status"></span>
     <button class="btn-outline" id="btn-sync">Sync from Granola</button>
-    <button class="btn-outline" id="btn-settings" title="Settings" style="padding:0.45rem 0.65rem;font-size:1rem;">⚙️</button>
   </div>
 </header>
 
@@ -491,30 +488,14 @@
   <button class="btn-success" id="btn-push-asana" disabled>Push to Asana</button>
 </footer>
 
-<!-- GRANOLA SYNC BANNER (shown after clicking Sync) -->
+<!-- BANNERS (shown after clicking Sync / Push) -->
 <div id="granola-banner" class="info-banner" style="display:none">
   <span>📋 Ask Claude Code to sync: <strong id="sync-cmd-text">Sync my Granola meetings to the kanban board</strong></span>
   <button class="copy-btn" id="btn-copy-sync">Copy</button>
 </div>
-
-<!-- SETTINGS MODAL -->
-<div id="settings-overlay" class="hidden" style="position:fixed;inset:0;background:rgba(0,0,0,0.7);align-items:center;justify-content:center;z-index:1000;backdrop-filter:blur(2px)">
-  <div id="settings-modal" style="background:#1a1d27;border:1px solid var(--card-border);border-radius:12px;padding:1.5rem;width:400px;box-shadow:var(--shadow)">
-    <h3 style="font-size:1rem;font-weight:700;margin-bottom:0.4rem">⚙️ Settings</h3>
-    <p style="font-size:0.75rem;color:var(--muted);margin-bottom:1.1rem">Your token is stored locally on this machine only.</p>
-    <label style="display:block;font-size:0.78rem;color:var(--muted);margin-bottom:0.8rem">
-      <span style="display:block;margin-bottom:0.25rem">Asana Personal Access Token</span>
-      <input id="input-pat" type="password" placeholder="Paste your token here…" style="width:100%;background:var(--card-bg);border:1px solid var(--card-border);border-radius:6px;padding:0.45rem 0.7rem;color:var(--text);font-size:0.82rem">
-      <span id="pat-status" style="display:block;font-size:0.7rem;margin-top:0.3rem;color:var(--muted)"></span>
-    </label>
-    <p style="font-size:0.72rem;color:var(--muted);margin-bottom:1.1rem">
-      Get a token at <strong style="color:var(--text)">app.asana.com → My Profile Settings → Apps → Personal Access Tokens</strong>
-    </p>
-    <div style="display:flex;gap:0.5rem;justify-content:flex-end">
-      <button class="btn-outline" id="btn-settings-cancel">Cancel</button>
-      <button class="btn-primary" id="btn-settings-save">Save Token</button>
-    </div>
-  </div>
+<div id="asana-banner" class="info-banner" style="display:none;border-color:rgba(78,205,196,0.3);background:rgba(78,205,196,0.05)">
+  <span>📋 Ask Claude Code to push: <strong id="asana-cmd-text">Push my pending Asana tasks from the kanban board</strong></span>
+  <button class="copy-btn" id="btn-copy-asana" style="background:var(--accent2);color:#000">Copy</button>
 </div>
 
 <div id="modal-overlay" class="hidden">
@@ -786,7 +767,7 @@ async function pushToAsana() {
   const projectGid = document.getElementById('asana-project-select').value;
   const actionItemIds = [...state.selectedCardIds];
   btn.disabled = true;
-  btn.innerHTML = '<span class="spinner"></span> Pushing…';
+  btn.innerHTML = '<span class="spinner"></span> Queuing…';
   try {
     const resp = await fetch('/api/asana/push', {
       method: 'POST',
@@ -794,25 +775,14 @@ async function pushToAsana() {
       body: JSON.stringify({ actionItemIds, projectGid })
     });
     const data = await resp.json();
-    if (data.error === 'NO_PAT') {
-      showToast('Add your Asana token in ⚙️ Settings first', 'error');
-      openSettings();
-      return;
-    }
-    if (data.success) {
-      for (const { actionItemId, asanaTaskGid } of (data.pushed || [])) {
-        const item = state.actionItems.find(i => i.id === actionItemId);
-        if (item) { item.status = 'pushed'; item.asanaTaskGid = asanaTaskGid; item.pushedAt = new Date().toISOString(); }
-      }
-      state.selectedCardIds.clear();
-      render();
-      const failMsg = data.failed?.length ? ` (${data.failed.length} failed)` : '';
-      showToast(`Pushed ${data.pushed.length} task${data.pushed.length !== 1 ? 's' : ''} to Asana ✓${failMsg}`, 'success');
+    if (data.success && data.requiresClaude) {
+      document.getElementById('asana-banner').style.display = 'flex';
+      showToast(`${data.taskCount} task${data.taskCount !== 1 ? 's' : ''} queued — ask Claude to push`, 'success');
     } else {
-      showToast('Push failed: ' + (data.error || 'unknown error'), 'error');
+      showToast('Queue failed: ' + (data.error || 'unknown error'), 'error');
     }
   } catch (err) {
-    showToast('Push failed: ' + err.message, 'error');
+    showToast('Queue failed: ' + err.message, 'error');
   } finally {
     btn.disabled = false;
     btn.textContent = 'Push to Asana';
@@ -826,44 +796,6 @@ async function saveTeammates() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ teammates: state.teammates })
   });
-}
-
-// ── Settings ────────────────────────────────────────────────────────────────
-
-async function fetchSettings() {
-  try {
-    const data = await fetch('/api/settings').then(r => r.json());
-    const status = document.getElementById('pat-status');
-    if (status) status.textContent = data.hasAsanaPat ? `Token saved (ending in ${data.asanaPatPreview})` : '';
-  } catch {}
-}
-
-function openSettings() {
-  document.getElementById('input-pat').value = '';
-  document.getElementById('pat-status').textContent = '';
-  document.getElementById('settings-overlay').classList.remove('hidden');
-  // fetch current status
-  fetch('/api/settings').then(r => r.json()).then(data => {
-    const status = document.getElementById('pat-status');
-    if (data.hasAsanaPat) status.textContent = `Current token ends in ${data.asanaPatPreview}`;
-  });
-  document.getElementById('input-pat').focus();
-}
-
-function closeSettings() {
-  document.getElementById('settings-overlay').classList.add('hidden');
-}
-
-async function saveSettings() {
-  const pat = document.getElementById('input-pat').value.trim();
-  if (!pat) { showToast('Paste your token first', 'error'); return; }
-  await fetch('/api/settings', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ asanaPat: pat })
-  });
-  closeSettings();
-  showToast('Asana token saved ✓', 'success');
 }
 
 // ── Modal ───────────────────────────────────────────────────────────────────
@@ -917,13 +849,13 @@ document.getElementById('btn-modal-cancel').addEventListener('click', closeModal
 document.getElementById('btn-modal-save').addEventListener('click', saveTeammate);
 document.getElementById('modal-overlay').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
 document.getElementById('input-gid').addEventListener('keydown', e => { if (e.key === 'Enter') saveTeammate(); });
-document.getElementById('btn-settings').addEventListener('click', openSettings);
-document.getElementById('btn-settings-cancel').addEventListener('click', closeSettings);
-document.getElementById('btn-settings-save').addEventListener('click', saveSettings);
-document.getElementById('settings-overlay').addEventListener('click', e => { if (e.target === e.currentTarget) closeSettings(); });
 document.getElementById('btn-copy-sync').addEventListener('click', () => {
-  const text = document.getElementById('sync-cmd-text').textContent;
-  navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard', 'success'));
+  navigator.clipboard.writeText(document.getElementById('sync-cmd-text').textContent)
+    .then(() => showToast('Copied to clipboard ✓', 'success'));
+});
+document.getElementById('btn-copy-asana').addEventListener('click', () => {
+  navigator.clipboard.writeText(document.getElementById('asana-cmd-text').textContent)
+    .then(() => showToast('Copied to clipboard ✓', 'success'));
 });
 
 // Prevent card drops from landing on column background (only on cards themselves)
@@ -939,7 +871,7 @@ setInterval(renderSyncStatus, 30000);
 // ── Boot ────────────────────────────────────────────────────────────────────
 
 (async () => {
-  await Promise.all([fetchMeetings(), fetchTeammates(), fetchSettings()]);
+  await Promise.all([fetchMeetings(), fetchTeammates()]);
 })();
 </script>
 </body>

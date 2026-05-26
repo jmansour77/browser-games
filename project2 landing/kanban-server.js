@@ -1,5 +1,4 @@
 const http = require('http');
-const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
@@ -7,7 +6,7 @@ const PORT = 8081;
 const DIR = __dirname;
 const MEETINGS_FILE = path.join(DIR, 'meetings-data.json');
 const TEAMMATES_FILE = path.join(DIR, 'teammates.json');
-const SETTINGS_FILE = path.join(DIR, 'kanban-settings.json');
+const ASANA_PENDING_FILE = path.join(DIR, 'asana-pending.json');
 
 const DEFAULT_TEAMMATES = {
   teammates: [{ id: 'tm-default', name: 'Jaffar H A', email: 'madojamas@gmail.com', asanaGid: '1215117503723367' }]
@@ -36,36 +35,6 @@ function json(res, data, status = 200) {
   res.end(JSON.stringify(data));
 }
 
-function asanaRequest(method, path, body, pat) {
-  return new Promise((resolve, reject) => {
-    const payload = body ? JSON.stringify(body) : null;
-    const options = {
-      hostname: 'app.asana.com',
-      path: `/api/1.0${path}`,
-      method,
-      headers: {
-        'Authorization': `Bearer ${pat}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {})
-      }
-    };
-    const req = https.request(options, res => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          const parsed = JSON.parse(data);
-          if (res.statusCode >= 400) reject(new Error(`Asana ${res.statusCode}: ${JSON.stringify(parsed.errors || parsed)}`));
-          else resolve(parsed);
-        } catch { reject(new Error(`Asana response parse error: ${data.slice(0, 200)}`)); }
-      });
-    });
-    req.on('error', reject);
-    if (payload) req.write(payload);
-    req.end();
-  });
-}
 
 function mergeActionItems(newMeetings, existingMeetings) {
   const existingMap = {};
@@ -150,71 +119,65 @@ const server = http.createServer(async (req, res) => {
       return json(res, { success: true });
     }
 
-    // ── Settings ─────────────────────────────────────────────────────────────
-    if (route === 'GET /api/settings') {
-      const s = readJSON(SETTINGS_FILE, {});
-      // Never expose the full PAT — just confirm whether it's set
-      return json(res, { hasAsanaPat: !!s.asanaPat, asanaPatPreview: s.asanaPat ? `...${s.asanaPat.slice(-4)}` : null });
-    }
-
-    if (route === 'POST /api/settings') {
-      const body = await readBody(req);
-      const current = readJSON(SETTINGS_FILE, {});
-      if (body.asanaPat !== undefined) current.asanaPat = body.asanaPat;
-      writeJSON(SETTINGS_FILE, current);
-      return json(res, { success: true });
-    }
-
-    // ── Asana push (REST API) ─────────────────────────────────────────────────
+    // ── Asana: queue tasks for Claude to push via MCP ────────────────────────
     if (route === 'POST /api/asana/push') {
       const body = await readBody(req);
       const { actionItemIds, projectGid } = body;
       if (!Array.isArray(actionItemIds) || !projectGid) {
         return json(res, { success: false, error: 'actionItemIds and projectGid required' }, 400);
       }
-
-      const settings = readJSON(SETTINGS_FILE, {});
-      if (!settings.asanaPat) {
-        return json(res, { success: false, error: 'NO_PAT', message: 'Asana Personal Access Token not configured. Open Settings to add it.' }, 400);
-      }
-
       const meetingsData = readJSON(MEETINGS_FILE, { meetings: [] });
       const teammatesData = readJSON(TEAMMATES_FILE, DEFAULT_TEAMMATES);
       const teammateMap = {};
       for (const t of teammatesData.teammates) teammateMap[t.id] = t;
 
-      const pushed = [];
-      const failed = [];
-      const now = new Date().toISOString();
-
+      const tasks = [];
       for (const m of meetingsData.meetings) {
         for (const ai of (m.actionItems || [])) {
           if (!actionItemIds.includes(ai.id)) continue;
           const assignee = teammateMap[ai.assigneeId];
-          const taskBody = {
-            data: {
-              name: ai.text,
-              projects: [projectGid],
-              notes: `From meeting: ${ai.meetingTitle} on ${ai.meetingDate ? new Date(ai.meetingDate).toLocaleDateString() : 'unknown'}`,
-              ...(assignee?.asanaGid ? { assignee: assignee.asanaGid } : {})
+          tasks.push({
+            actionItemId: ai.id,
+            name: ai.text,
+            projectGid,
+            assigneeGid: assignee?.asanaGid || null,
+            assigneeName: assignee?.name || null,
+            notes: `From meeting: ${ai.meetingTitle} on ${ai.meetingDate ? new Date(ai.meetingDate).toLocaleDateString() : 'unknown'}`
+          });
+        }
+      }
+      writeJSON(ASANA_PENDING_FILE, { tasks, requestedAt: new Date().toISOString() });
+      console.log(`[asana] queued ${tasks.length} tasks for Claude to push`);
+      return json(res, { success: true, requiresClaude: true, taskCount: tasks.length });
+    }
+
+    // Called by Claude after pushing tasks via MCP
+    if (route === 'POST /api/asana/complete') {
+      const body = await readBody(req);
+      if (!Array.isArray(body.pushed)) return json(res, { success: false, error: 'pushed array required' }, 400);
+      const meetingsData = readJSON(MEETINGS_FILE, { meetings: [] });
+      const now = new Date().toISOString();
+      for (const { actionItemId, asanaTaskGid } of body.pushed) {
+        for (const m of meetingsData.meetings) {
+          for (const ai of (m.actionItems || [])) {
+            if (ai.id === actionItemId) {
+              ai.status = 'pushed';
+              ai.asanaTaskGid = asanaTaskGid;
+              ai.pushedAt = now;
             }
-          };
-          try {
-            const result = await asanaRequest('POST', '/tasks', taskBody, settings.asanaPat);
-            ai.status = 'pushed';
-            ai.asanaTaskGid = result.data.gid;
-            ai.pushedAt = now;
-            pushed.push({ actionItemId: ai.id, asanaTaskGid: result.data.gid });
-            console.log(`[asana] created task "${ai.text.slice(0, 40)}" → ${result.data.gid}`);
-          } catch (err) {
-            console.error(`[asana] failed to create task "${ai.text.slice(0, 40)}":`, err.message);
-            failed.push({ actionItemId: ai.id, error: err.message });
           }
         }
       }
-
       writeJSON(MEETINGS_FILE, meetingsData);
-      return json(res, { success: true, pushed, failed });
+      // Clear the pending file
+      try { fs.unlinkSync(ASANA_PENDING_FILE); } catch {}
+      console.log(`[asana] marked ${body.pushed.length} tasks as pushed`);
+      return json(res, { success: true });
+    }
+
+    // Get pending Asana tasks (for Claude to read)
+    if (route === 'GET /api/asana/pending') {
+      return json(res, readJSON(ASANA_PENDING_FILE, { tasks: [] }));
     }
 
     res.writeHead(404, { 'Content-Type': 'text/plain' });

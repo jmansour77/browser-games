@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meeting Action Items</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --col-bg: #1a1d27;
+    --card-bg: #242736;
+    --card-border: #2e3145;
+    --accent: #6c63ff;
+    --accent2: #4ecdc4;
+    --accent3: #f7b731;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --success: #22c55e;
+    --danger: #ef4444;
+    --radius: 10px;
+    --shadow: 0 2px 12px rgba(0,0,0,0.5);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* TOP BAR */
+  #topbar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.85rem 1.5rem;
+    border-bottom: 1px solid var(--card-border);
+    background: #12151f;
+  }
+  #topbar h1 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  #topbar h1 span.logo { font-size: 1.3rem; }
+  .topbar-right { display: flex; align-items: center; gap: 0.75rem; }
+  #sync-status { font-size: 0.75rem; color: var(--muted); }
+
+  /* BUTTONS */
+  button {
+    cursor: pointer;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    padding: 0.45rem 0.9rem;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  button:active { transform: scale(0.97); }
+  button:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover:not(:disabled) { background: #7d75ff; }
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--card-border);
+    color: var(--text);
+  }
+  .btn-outline:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .btn-success { background: var(--success); color: #fff; }
+  .btn-success:hover:not(:disabled) { background: #16a34a; }
+
+  /* TEAM ROW */
+  #team-row {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.65rem 1.5rem;
+    border-bottom: 1px solid var(--card-border);
+    background: #12151f;
+    overflow-x: auto;
+  }
+  #team-row .label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    white-space: nowrap;
+    margin-right: 0.25rem;
+  }
+  #avatars-container { display: flex; align-items: center; gap: 0.5rem; }
+
+  .avatar {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 0.78rem; color: #fff;
+    cursor: grab;
+    flex-shrink: 0;
+    border: 2px solid transparent;
+    transition: border-color 0.15s, transform 0.15s;
+    position: relative;
+    user-select: none;
+  }
+  .avatar:hover { transform: scale(1.1); border-color: rgba(255,255,255,0.3); }
+  .avatar:active { cursor: grabbing; transform: scale(1.05); }
+  .avatar.dragging { opacity: 0.5; }
+  .avatar-tooltip {
+    position: absolute;
+    bottom: -30px; left: 50%; transform: translateX(-50%);
+    background: #1a1d27;
+    border: 1px solid var(--card-border);
+    color: var(--text);
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 100;
+    display: none;
+  }
+  .avatar:hover .avatar-tooltip { display: block; }
+
+  .avatar-sm {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 700; font-size: 0.6rem; color: #fff;
+    flex-shrink: 0;
+  }
+
+  #btn-add-teammate {
+    background: transparent;
+    border: 1.5px dashed var(--card-border);
+    color: var(--muted);
+    border-radius: 50%;
+    width: 38px; height: 38px;
+    font-size: 1.2rem;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0;
+    flex-shrink: 0;
+  }
+  #btn-add-teammate:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* BOARD */
+  #board {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    padding: 1rem 1.5rem;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  .column {
+    display: flex;
+    flex-direction: column;
+    background: var(--col-bg);
+    border-radius: var(--radius);
+    overflow: hidden;
+    border: 1px solid var(--card-border);
+  }
+  .col-header {
+    padding: 0.65rem 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--card-border);
+    flex-shrink: 0;
+  }
+  .col-header h2 {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: var(--muted);
+  }
+  .col-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    display: inline-block; margin-right: 0.45rem;
+  }
+  #col-unassigned .col-dot { background: var(--muted); }
+  #col-assigned .col-dot { background: var(--accent2); }
+  #col-pushed .col-dot { background: var(--success); }
+  .col-count {
+    font-size: 0.72rem;
+    background: rgba(255,255,255,0.07);
+    border-radius: 10px;
+    padding: 1px 7px;
+    color: var(--muted);
+  }
+  .cards-container {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    min-height: 80px;
+  }
+  .cards-container::-webkit-scrollbar { width: 4px; }
+  .cards-container::-webkit-scrollbar-track { background: transparent; }
+  .cards-container::-webkit-scrollbar-thumb { background: var(--card-border); border-radius: 2px; }
+
+  .drop-hint {
+    border: 1.5px dashed var(--card-border);
+    border-radius: 8px;
+    padding: 1rem;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--muted);
+    flex-shrink: 0;
+  }
+  .drop-hint.active { border-color: var(--accent2); color: var(--accent2); background: rgba(78,205,196,0.04); }
+
+  /* CARDS */
+  .card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 0.7rem 0.8rem;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s;
+    position: relative;
+  }
+  .card:hover { border-color: #3d4160; }
+  .card.selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(108,99,255,0.25);
+  }
+  .card.drag-over {
+    border-color: var(--accent2);
+    box-shadow: 0 0 0 2px rgba(78,205,196,0.3);
+    background: #1e2a2a;
+  }
+  .card.pushed { opacity: 0.75; cursor: default; }
+  .card-text {
+    font-size: 0.83rem;
+    line-height: 1.45;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+  }
+  .card-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .card-source {
+    font-size: 0.68rem;
+    color: var(--muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+  }
+  .card-assignee {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    flex-shrink: 0;
+  }
+  .card-assignee-name {
+    font-size: 0.68rem;
+    color: var(--muted);
+  }
+  .card-pushed-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.65rem;
+    color: var(--success);
+    background: rgba(34,197,94,0.1);
+    border-radius: 4px;
+    padding: 2px 6px;
+    margin-top: 0.4rem;
+  }
+  .card-check {
+    position: absolute;
+    top: 0.5rem; right: 0.5rem;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    border: 1.5px solid var(--card-border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.55rem;
+    color: transparent;
+    flex-shrink: 0;
+  }
+  .card.selected .card-check {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+
+  /* ACTION BAR */
+  #action-bar {
+    flex-shrink: 0;
+    padding: 0.65rem 1.5rem;
+    border-top: 1px solid var(--card-border);
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: #12151f;
+  }
+  #selected-count {
+    font-size: 0.78rem;
+    color: var(--muted);
+    flex: 1;
+  }
+  #asana-project-select {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 0.4rem 0.7rem;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+  #asana-project-select:focus { outline: none; border-color: var(--accent); }
+
+  /* MODAL */
+  #modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(2px);
+  }
+  #modal-overlay.hidden { display: none; }
+  #modal {
+    background: #1a1d27;
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    width: 360px;
+    box-shadow: var(--shadow);
+  }
+  #modal h3 { font-size: 1rem; font-weight: 700; margin-bottom: 1rem; }
+  #modal label {
+    display: block;
+    font-size: 0.78rem;
+    color: var(--muted);
+    margin-bottom: 0.6rem;
+  }
+  #modal label span { display: block; margin-bottom: 0.25rem; }
+  #modal input {
+    width: 100%;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 6px;
+    padding: 0.45rem 0.7rem;
+    color: var(--text);
+    font-size: 0.82rem;
+  }
+  #modal input:focus { outline: none; border-color: var(--accent); }
+  .modal-buttons { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1.25rem; }
+
+  /* TOASTS */
+  #toast-container {
+    position: fixed;
+    bottom: 4.5rem; right: 1.5rem;
+    display: flex; flex-direction: column; gap: 0.5rem;
+    z-index: 2000;
+    pointer-events: none;
+  }
+  .toast {
+    background: var(--col-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    padding: 0.6rem 1rem;
+    font-size: 0.8rem;
+    color: var(--text);
+    box-shadow: var(--shadow);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.2s, transform 0.2s;
+    max-width: 320px;
+    pointer-events: none;
+  }
+  .toast.visible { opacity: 1; transform: translateY(0); }
+  .toast.toast-error { border-color: var(--danger); }
+  .toast.toast-success { border-color: var(--success); }
+
+  /* EMPTY STATE */
+  .empty-state {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 2rem 1rem; gap: 0.5rem; text-align: center;
+    color: var(--muted); font-size: 0.8rem;
+  }
+  .empty-state .icon { font-size: 1.8rem; opacity: 0.4; }
+
+  /* LOADING SPINNER */
+  .spinner {
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.2);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header id="topbar">
+  <h1><span class="logo">🗂️</span> Meeting Action Items</h1>
+  <div class="topbar-right">
+    <span id="sync-status"></span>
+    <button class="btn-outline" id="btn-sync">Sync from Granola</button>
+  </div>
+</header>
+
+<section id="team-row">
+  <span class="label">Team</span>
+  <div id="avatars-container"></div>
+  <button id="btn-add-teammate" title="Add teammate">+</button>
+</section>
+
+<main id="board">
+  <div class="column" id="col-unassigned">
+    <div class="col-header">
+      <h2><span class="col-dot"></span>Unassigned</h2>
+      <span class="col-count" id="count-unassigned">0</span>
+    </div>
+    <div class="cards-container" id="cards-unassigned">
+      <div class="drop-hint" id="hint-unassigned">Drop an avatar here to assign</div>
+    </div>
+  </div>
+  <div class="column" id="col-assigned">
+    <div class="col-header">
+      <h2><span class="col-dot"></span>Assigned</h2>
+      <span class="col-count" id="count-assigned">0</span>
+    </div>
+    <div class="cards-container" id="cards-assigned">
+      <div class="drop-hint" id="hint-assigned">Drag avatars onto cards to assign</div>
+    </div>
+  </div>
+  <div class="column" id="col-pushed">
+    <div class="col-header">
+      <h2><span class="col-dot"></span>Pushed to Asana</h2>
+      <span class="col-count" id="count-pushed">0</span>
+    </div>
+    <div class="cards-container" id="cards-pushed">
+      <div class="drop-hint" id="hint-pushed">Pushed tasks appear here</div>
+    </div>
+  </div>
+</main>
+
+<footer id="action-bar">
+  <span id="selected-count">Click assigned cards to select for push</span>
+  <select id="asana-project-select">
+    <option value="1215117504124135">Jaffar's first project</option>
+  </select>
+  <button class="btn-success" id="btn-push-asana" disabled>Push to Asana</button>
+</footer>
+
+<div id="modal-overlay" class="hidden">
+  <div id="modal">
+    <h3>Add Teammate</h3>
+    <label><span>Name *</span><input id="input-name" type="text" placeholder="Jane Doe"></label>
+    <label><span>Email *</span><input id="input-email" type="email" placeholder="jane@example.com"></label>
+    <label><span>Asana GID <em style="font-style:normal;color:#555">(optional)</em></span><input id="input-gid" type="text" placeholder="e.g. 1234567890123456"></label>
+    <div class="modal-buttons">
+      <button class="btn-outline" id="btn-modal-cancel">Cancel</button>
+      <button class="btn-primary" id="btn-modal-save">Add Teammate</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+const state = {
+  meetings: [],
+  syncedAt: null,
+  teammates: [],
+  actionItems: [],
+  selectedCardIds: new Set(),
+  draggingTeammateId: null
+};
+
+// ── Avatar helpers ──────────────────────────────────────────────────────────
+
+function getColor(name) {
+  let h = 0;
+  for (const c of name) h = (h * 31 + c.charCodeAt(0)) & 0xffffffff;
+  return `hsl(${Math.abs(h) % 360},58%,42%)`;
+}
+
+function getInitials(name) {
+  return name.trim().split(/\s+/).map(w => w[0] || '').join('').toUpperCase().slice(0, 2) || '?';
+}
+
+function makeAvatar(teammate, size = 38, draggable = true) {
+  const el = document.createElement('div');
+  el.className = 'avatar';
+  el.style.cssText = `width:${size}px;height:${size}px;background:${getColor(teammate.name)}`;
+  el.textContent = getInitials(teammate.name);
+  if (draggable) {
+    el.draggable = true;
+    el.addEventListener('dragstart', e => {
+      state.draggingTeammateId = teammate.id;
+      e.dataTransfer.setData('text/plain', teammate.id);
+      e.dataTransfer.effectAllowed = 'copy';
+      el.classList.add('dragging');
+      document.querySelectorAll('.cards-container').forEach(c => c.classList.add('drop-active'));
+    });
+    el.addEventListener('dragend', () => {
+      state.draggingTeammateId = null;
+      el.classList.remove('dragging');
+      document.querySelectorAll('.cards-container').forEach(c => c.classList.remove('drop-active'));
+    });
+  }
+  const tip = document.createElement('span');
+  tip.className = 'avatar-tooltip';
+  tip.textContent = teammate.name + (teammate.email ? ` · ${teammate.email}` : '');
+  el.appendChild(tip);
+  return el;
+}
+
+function makeAvatarSm(teammate) {
+  const el = document.createElement('div');
+  el.className = 'avatar-sm';
+  el.style.background = getColor(teammate.name);
+  el.textContent = getInitials(teammate.name);
+  el.title = teammate.name;
+  return el;
+}
+
+// ── Render ──────────────────────────────────────────────────────────────────
+
+function render() {
+  renderAvatars();
+  renderBoard();
+  renderActionBar();
+  renderSyncStatus();
+}
+
+function renderAvatars() {
+  const container = document.getElementById('avatars-container');
+  container.innerHTML = '';
+  for (const t of state.teammates) {
+    container.appendChild(makeAvatar(t));
+  }
+}
+
+function renderBoard() {
+  const cols = { unassigned: [], assigned: [], pushed: [] };
+  for (const item of state.actionItems) {
+    const col = cols[item.status] || cols.unassigned;
+    col.push(item);
+  }
+  for (const [status, items] of Object.entries(cols)) {
+    const container = document.getElementById(`cards-${status}`);
+    const countEl = document.getElementById(`count-${status}`);
+    const hint = document.getElementById(`hint-${status}`);
+    countEl.textContent = items.length;
+    // Remove old cards (keep hint)
+    Array.from(container.querySelectorAll('.card')).forEach(c => c.remove());
+    if (items.length === 0) {
+      if (hint) hint.style.display = '';
+    } else {
+      if (hint) hint.style.display = 'none';
+      for (const item of items) {
+        container.appendChild(renderCard(item));
+      }
+    }
+  }
+}
+
+function renderCard(item) {
+  const assignee = state.teammates.find(t => t.id === item.assigneeId);
+  const isPushed = item.status === 'pushed';
+  const isSelected = state.selectedCardIds.has(item.id);
+
+  const card = document.createElement('div');
+  card.className = 'card' + (isSelected ? ' selected' : '') + (isPushed ? ' pushed' : '');
+  card.dataset.id = item.id;
+
+  // Check badge (for selection)
+  if (!isPushed) {
+    const check = document.createElement('div');
+    check.className = 'card-check';
+    check.textContent = '✓';
+    card.appendChild(check);
+  }
+
+  const text = document.createElement('div');
+  text.className = 'card-text';
+  text.textContent = item.text;
+  card.appendChild(text);
+
+  const meta = document.createElement('div');
+  meta.className = 'card-meta';
+
+  const source = document.createElement('div');
+  source.className = 'card-source';
+  const dateStr = item.meetingDate ? new Date(item.meetingDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+  source.textContent = item.meetingTitle + (dateStr ? ` · ${dateStr}` : '');
+  meta.appendChild(source);
+
+  if (assignee) {
+    const assigneeEl = document.createElement('div');
+    assigneeEl.className = 'card-assignee';
+    assigneeEl.appendChild(makeAvatarSm(assignee));
+    meta.appendChild(assigneeEl);
+  }
+  card.appendChild(meta);
+
+  if (isPushed) {
+    const badge = document.createElement('div');
+    badge.className = 'card-pushed-badge';
+    badge.innerHTML = '✓ In Asana' + (item.asanaTaskGid ? ` <span style="opacity:0.5">#${item.asanaTaskGid.slice(-6)}</span>` : '');
+    card.appendChild(badge);
+  }
+
+  // Click to select (non-pushed cards)
+  if (!isPushed) {
+    card.addEventListener('click', () => {
+      if (state.selectedCardIds.has(item.id)) state.selectedCardIds.delete(item.id);
+      else state.selectedCardIds.add(item.id);
+      renderBoard();
+      renderActionBar();
+    });
+  }
+
+  // Drag-over for teammate assignment
+  card.addEventListener('dragover', e => {
+    if (!state.draggingTeammateId) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    card.classList.add('drag-over');
+  });
+  card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+  card.addEventListener('drop', async e => {
+    e.preventDefault();
+    card.classList.remove('drag-over');
+    const teammateId = e.dataTransfer.getData('text/plain') || state.draggingTeammateId;
+    if (teammateId && !isPushed) {
+      await assignTeammate(item.id, teammateId);
+    }
+  });
+
+  return card;
+}
+
+function renderActionBar() {
+  const sel = state.selectedCardIds.size;
+  const countEl = document.getElementById('selected-count');
+  const pushBtn = document.getElementById('btn-push-asana');
+  if (sel === 0) {
+    countEl.textContent = 'Click assigned cards to select for push';
+    pushBtn.disabled = true;
+  } else {
+    countEl.textContent = `${sel} card${sel !== 1 ? 's' : ''} selected`;
+    pushBtn.disabled = false;
+  }
+}
+
+function renderSyncStatus() {
+  const el = document.getElementById('sync-status');
+  if (!state.syncedAt) { el.textContent = 'Not synced'; return; }
+  const mins = Math.round((Date.now() - new Date(state.syncedAt)) / 60000);
+  if (mins < 1) el.textContent = 'Synced just now';
+  else if (mins < 60) el.textContent = `Synced ${mins}m ago`;
+  else el.textContent = `Synced ${Math.round(mins / 60)}h ago`;
+}
+
+// ── Data fetching ───────────────────────────────────────────────────────────
+
+async function fetchMeetings() {
+  const data = await fetch('/api/meetings').then(r => r.json());
+  state.meetings = data.meetings || [];
+  state.syncedAt = data.syncedAt;
+  state.actionItems = state.meetings.flatMap(m => m.actionItems || []);
+  // Clean up selectedCardIds for items that no longer exist
+  const ids = new Set(state.actionItems.map(i => i.id));
+  for (const id of state.selectedCardIds) if (!ids.has(id)) state.selectedCardIds.delete(id);
+  render();
+}
+
+async function fetchTeammates() {
+  const data = await fetch('/api/teammates').then(r => r.json());
+  state.teammates = data.teammates || [];
+  render();
+}
+
+// ── Actions ─────────────────────────────────────────────────────────────────
+
+async function assignTeammate(actionItemId, teammateId) {
+  const item = state.actionItems.find(i => i.id === actionItemId);
+  if (!item) return;
+  item.assigneeId = teammateId;
+  item.status = 'assigned';
+  render();
+  try {
+    await fetch('/api/meetings/item', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: actionItemId, patch: { assigneeId: teammateId, status: 'assigned' } })
+    });
+  } catch (err) {
+    showToast('Failed to save assignment', 'error');
+  }
+}
+
+async function syncFromGranola() {
+  const btn = document.getElementById('btn-sync');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Syncing…';
+  try {
+    const resp = await fetch('/api/granola/sync', { method: 'POST' });
+    const data = await resp.json();
+    if (data.success) {
+      await fetchMeetings();
+      showToast(`Synced ${data.meetingCount} meetings · ${data.actionItemCount} action items`, 'success');
+    } else {
+      showToast('Sync failed: ' + (data.error || 'unknown error'), 'error');
+      if (data.debugOutput) console.error('[granola debug]', data.debugOutput);
+    }
+  } catch (err) {
+    showToast('Sync failed: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Sync from Granola';
+  }
+}
+
+async function pushToAsana() {
+  const btn = document.getElementById('btn-push-asana');
+  const projectGid = document.getElementById('asana-project-select').value;
+  const actionItemIds = [...state.selectedCardIds];
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Pushing…';
+  try {
+    const resp = await fetch('/api/asana/push', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ actionItemIds, projectGid })
+    });
+    const data = await resp.json();
+    if (data.success) {
+      // Update in-memory state from server response
+      for (const { actionItemId, asanaTaskGid } of (data.pushed || [])) {
+        const item = state.actionItems.find(i => i.id === actionItemId);
+        if (item) { item.status = 'pushed'; item.asanaTaskGid = asanaTaskGid; item.pushedAt = new Date().toISOString(); }
+      }
+      state.selectedCardIds.clear();
+      render();
+      showToast(`Pushed ${data.pushed.length} task${data.pushed.length !== 1 ? 's' : ''} to Asana ✓`, 'success');
+    } else {
+      showToast('Push failed: ' + (data.error || 'unknown error'), 'error');
+      if (data.debugOutput) console.error('[asana debug]', data.debugOutput);
+    }
+  } catch (err) {
+    showToast('Push failed: ' + err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Push to Asana';
+    renderActionBar();
+  }
+}
+
+async function saveTeammates() {
+  await fetch('/api/teammates', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ teammates: state.teammates })
+  });
+}
+
+// ── Modal ───────────────────────────────────────────────────────────────────
+
+function openModal() {
+  document.getElementById('input-name').value = '';
+  document.getElementById('input-email').value = '';
+  document.getElementById('input-gid').value = '';
+  document.getElementById('modal-overlay').classList.remove('hidden');
+  document.getElementById('input-name').focus();
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.add('hidden');
+}
+
+async function saveTeammate() {
+  const name = document.getElementById('input-name').value.trim();
+  const email = document.getElementById('input-email').value.trim();
+  const gid = document.getElementById('input-gid').value.trim();
+  if (!name || !email) { showToast('Name and email are required', 'error'); return; }
+  const newTm = { id: `tm-${Date.now()}`, name, email, asanaGid: gid || null };
+  state.teammates.push(newTm);
+  await saveTeammates();
+  closeModal();
+  render();
+  showToast(`Added ${name}`, 'success');
+}
+
+// ── Toast ───────────────────────────────────────────────────────────────────
+
+function showToast(message, type = 'success') {
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+  toast.textContent = message;
+  container.appendChild(toast);
+  requestAnimationFrame(() => { requestAnimationFrame(() => toast.classList.add('visible')); });
+  setTimeout(() => {
+    toast.classList.remove('visible');
+    setTimeout(() => toast.remove(), 300);
+  }, 3500);
+}
+
+// ── Event listeners ──────────────────────────────────────────────────────────
+
+document.getElementById('btn-sync').addEventListener('click', syncFromGranola);
+document.getElementById('btn-push-asana').addEventListener('click', pushToAsana);
+document.getElementById('btn-add-teammate').addEventListener('click', openModal);
+document.getElementById('btn-modal-cancel').addEventListener('click', closeModal);
+document.getElementById('btn-modal-save').addEventListener('click', saveTeammate);
+document.getElementById('modal-overlay').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+document.getElementById('input-gid').addEventListener('keydown', e => { if (e.key === 'Enter') saveTeammate(); });
+
+// Prevent card drops from landing on column background (only on cards themselves)
+document.querySelectorAll('.cards-container').forEach(container => {
+  container.addEventListener('dragover', e => {
+    if (state.draggingTeammateId) e.preventDefault();
+  });
+});
+
+// Sync status ticker
+setInterval(renderSyncStatus, 30000);
+
+// ── Boot ────────────────────────────────────────────────────────────────────
+
+(async () => {
+  await Promise.all([fetchMeetings(), fetchTeammates()]);
+})();
+</script>
+</body>
+</html>

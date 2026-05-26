@@ -1,0 +1,103 @@
+{
+  "syncedAt": "2026-05-26T10:00:00.000Z",
+  "meetings": [
+    {
+      "id": "mtg-demo-001",
+      "title": "Product Roadmap Q2",
+      "date": "2026-05-22T09:00:00.000Z",
+      "actionItems": [
+        {
+          "id": "mtg-demo-001-ai-0",
+          "text": "Follow up with design team on landing page mockups",
+          "meetingId": "mtg-demo-001",
+          "meetingTitle": "Product Roadmap Q2",
+          "meetingDate": "2026-05-22T09:00:00.000Z",
+          "assigneeId": null,
+          "status": "unassigned",
+          "asanaTaskGid": null,
+          "pushedAt": null
+        },
+        {
+          "id": "mtg-demo-001-ai-1",
+          "text": "Set up analytics dashboard for new feature launch",
+          "meetingId": "mtg-demo-001",
+          "meetingTitle": "Product Roadmap Q2",
+          "meetingDate": "2026-05-22T09:00:00.000Z",
+          "assigneeId": null,
+          "status": "unassigned",
+          "asanaTaskGid": null,
+          "pushedAt": null
+        },
+        {
+          "id": "mtg-demo-001-ai-2",
+          "text": "Draft announcement copy for the May release blog post",
+          "meetingId": "mtg-demo-001",
+          "meetingTitle": "Product Roadmap Q2",
+          "meetingDate": "2026-05-22T09:00:00.000Z",
+          "assigneeId": null,
+          "status": "unassigned",
+          "asanaTaskGid": null,
+          "pushedAt": null
+        }
+      ]
+    },
+    {
+      "id": "mtg-demo-002",
+      "title": "Engineering Standup",
+      "date": "2026-05-24T09:30:00.000Z",
+      "actionItems": [
+        {
+          "id": "mtg-demo-002-ai-0",
+          "text": "Fix the auth token refresh bug before Friday deploy",
+          "meetingId": "mtg-demo-002",
+          "meetingTitle": "Engineering Standup",
+          "meetingDate": "2026-05-24T09:30:00.000Z",
+          "assigneeId": null,
+          "status": "unassigned",
+          "asanaTaskGid": null,
+          "pushedAt": null
+        },
+        {
+          "id": "mtg-demo-002-ai-1",
+          "text": "Review and merge the open PRs for the search feature",
+          "meetingId": "mtg-demo-002",
+          "meetingTitle": "Engineering Standup",
+          "meetingDate": "2026-05-24T09:30:00.000Z",
+          "assigneeId": null,
+          "status": "unassigned",
+          "asanaTaskGid": null,
+          "pushedAt": null
+        }
+      ]
+    },
+    {
+      "id": "mtg-demo-003",
+      "title": "Client Onboarding Call",
+      "date": "2026-05-25T14:00:00.000Z",
+      "actionItems": [
+        {
+          "id": "mtg-demo-003-ai-0",
+          "text": "Send onboarding documentation to the client by EOD Monday",
+          "meetingId": "mtg-demo-003",
+          "meetingTitle": "Client Onboarding Call",
+          "meetingDate": "2026-05-25T14:00:00.000Z",
+          "assigneeId": null,
+          "status": "unassigned",
+          "asanaTaskGid": null,
+          "pushedAt": null
+        },
+        {
+          "id": "mtg-demo-003-ai-1",
+          "text": "Schedule follow-up training session for the client team",
+          "meetingId": "mtg-demo-003",
+          "meetingTitle": "Client Onboarding Call",
+          "meetingDate": "2026-05-25T14:00:00.000Z",
+          "assigneeId": "tm-default",
+          "status": "assigned",
+          "asanaTaskGid": null,
+          "pushedAt": null
+        }
+      ]
+    }
+  ]
+}

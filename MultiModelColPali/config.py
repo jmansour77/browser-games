@@ -15,11 +15,8 @@ load_dotenv(_here / ".env")
 
 # ── API Keys ──────────────────────────────────────────────────────
 ANTHROPIC_API_KEY: str = os.environ.get("ANTHROPIC_API_KEY", "")
-if not ANTHROPIC_API_KEY:
-    raise EnvironmentError(
-        "ANTHROPIC_API_KEY is not set. "
-        "Copy .env.example to .env and add your key."
-    )
+# NOTE: We do NOT raise here so Streamlit can still load and show a setup guide.
+# Modules that actually need the key (generation.py) will fail with a clear message.
 
 # ── Model Settings ────────────────────────────────────────────────
 COLPALI_MODEL: str = os.environ.get("COLPALI_MODEL", "vidore/colpali-v1.2")

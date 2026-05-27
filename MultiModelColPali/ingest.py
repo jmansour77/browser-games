@@ -41,29 +41,48 @@ PAGES_SCHEMA = pa.schema([
 
 # ── Model loading ─────────────────────────────────────────────────────────────
 
+def _get_model_classes():
+    """
+    Return the correct (ModelClass, ProcessorClass) for the configured model.
+
+    colpali-v1.x  → ColPali      + ColPaliProcessor
+    colqwen2-v*   → ColQwen2     + ColQwen2Processor
+    """
+    model_name = config.COLPALI_MODEL.lower()
+    if "colqwen2" in model_name or "qwen2" in model_name:
+        from colpali_engine.models import ColQwen2, ColQwen2Processor
+        return ColQwen2, ColQwen2Processor
+    else:
+        from colpali_engine.models import ColPali, ColPaliProcessor
+        return ColPali, ColPaliProcessor
+
+
 @functools.lru_cache(maxsize=1)
 def load_colpali_model():
     """
-    Load the ColPali model and processor.
+    Load the ColPali/ColQwen2 model and processor.
     Cached with lru_cache so repeated calls don't reload the model.
+
+    Supports both:
+      - vidore/colpali-v1.2    (PaliGemma 3B)
+      - vidore/colqwen2-v1.0   (Qwen2-VL 2B, lighter — recommended for CPU)
 
     Returns:
         (model, processor) tuple, both ready for inference.
     """
-    from colpali_engine.models import ColPali, ColPaliProcessor
+    ModelClass, ProcessorClass = _get_model_classes()
+    print(f"[ingest] Loading '{config.COLPALI_MODEL}' ({ModelClass.__name__}) on {config.DEVICE}...")
 
-    print(f"[ingest] Loading ColPali model '{config.COLPALI_MODEL}' on {config.DEVICE}...")
-
-    # bfloat16 on GPU halves VRAM; float32 required on CPU (no bfloat16 support)
+    # bfloat16 on GPU halves VRAM; float32 required on CPU
     dtype = torch.bfloat16 if config.DEVICE == "cuda" else torch.float32
 
-    model = ColPali.from_pretrained(
+    model = ModelClass.from_pretrained(
         config.COLPALI_MODEL,
         torch_dtype=dtype,
         device_map=config.DEVICE,
     ).eval()
 
-    processor = ColPaliProcessor.from_pretrained(config.COLPALI_MODEL)
+    processor = ProcessorClass.from_pretrained(config.COLPALI_MODEL)
 
     print(f"[ingest] Model loaded. Parameters: {sum(p.numel() for p in model.parameters()):,}")
     return model, processor

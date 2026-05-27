@@ -1,0 +1,39 @@
+# ══════════════════════════════════════════════════════════════════
+# Multimodal Vision-First RAG — ColPali + LanceDB + Claude
+# ══════════════════════════════════════════════════════════════════
+#
+# STEP 1 — Install PyTorch FIRST (before everything else):
+#
+#   GPU (CUDA 12.1):
+#     pip install torch==2.5.1 torchvision --index-url https://download.pytorch.org/whl/cu121
+#
+#   CPU only:
+#     pip install torch==2.5.1 torchvision --index-url https://download.pytorch.org/whl/cpu
+#
+# STEP 2 — Then install the rest:
+#     pip install -r requirements.txt
+# ══════════════════════════════════════════════════════════════════
+
+# ── ColPali (Vision-First document embedding) ─────────────────────
+colpali-engine>=0.3.4
+transformers>=4.44.0
+peft>=0.11.0
+
+# ── Vector Database ───────────────────────────────────────────────
+lancedb>=0.13.0
+pyarrow>=14.0.0
+
+# ── PDF Processing (no Poppler needed on Windows) ─────────────────
+pymupdf>=1.24.0
+
+# ── Claude API ────────────────────────────────────────────────────
+anthropic>=0.40.0
+
+# ── Streamlit UI ──────────────────────────────────────────────────
+streamlit>=1.38.0
+
+# ── Utilities ─────────────────────────────────────────────────────
+python-dotenv>=1.0.0
+pillow>=10.0.0
+numpy>=1.26.0
+tqdm>=4.66.0

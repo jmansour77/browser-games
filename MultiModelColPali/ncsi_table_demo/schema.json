@@ -1,0 +1,14 @@
+{
+  "id": "annual-wide-v1",
+  "dimensions": [
+    "Area",
+    "Category"
+  ],
+  "role_header": "Role",
+  "period_pattern": "[0-9]{4}",
+  "roles": [
+    "detail",
+    "total"
+  ],
+  "total_dimension": "Area"
+}

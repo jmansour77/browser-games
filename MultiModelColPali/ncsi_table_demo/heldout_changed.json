@@ -1,0 +1,48 @@
+{
+  "metadata": {
+    "document_id": "synthetic-heldout",
+    "table_id": "unseen-B",
+    "title": {
+      "en": "Synthetic activity counts",
+      "ar": "أعداد أنشطة افتراضية"
+    },
+    "description": {
+      "en": "synthetic demonstration only; not official NCSI statistics"
+    },
+    "evidence_kind": "synthetic demonstration only",
+    "units": "demonstration units",
+    "measure": "activity",
+    "notes": [
+      "All values and dimension members are synthetic."
+    ],
+    "source": {
+      "uri": "synthetic:synthetic-heldout",
+      "sheet": "Demo",
+      "start_row": 1,
+      "start_column": 1
+    }
+  },
+  "headers": [
+    "Area",
+    "Category",
+    "Role",
+    "2030",
+    "2031"
+  ],
+  "rows": [
+    [
+      "East",
+      "B",
+      "detail",
+      "10.25",
+      "14.25"
+    ],
+    [
+      "West",
+      "B",
+      "detail",
+      "20.75",
+      "25.75"
+    ]
+  ]
+}

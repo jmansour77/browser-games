@@ -1,0 +1,55 @@
+{
+  "metadata": {
+    "document_id": "synthetic-example",
+    "table_id": "example-A",
+    "title": {
+      "en": "Synthetic activity counts",
+      "ar": "أعداد أنشطة افتراضية"
+    },
+    "description": {
+      "en": "synthetic demonstration only; not official NCSI statistics"
+    },
+    "evidence_kind": "synthetic demonstration only",
+    "units": "demonstration units",
+    "measure": "activity",
+    "notes": [
+      "All values and dimension members are synthetic."
+    ],
+    "source": {
+      "uri": "synthetic:synthetic-example",
+      "sheet": "Demo",
+      "start_row": 1,
+      "start_column": 1
+    }
+  },
+  "headers": [
+    "Area",
+    "Category",
+    "Role",
+    "2020",
+    "2021"
+  ],
+  "rows": [
+    [
+      "North",
+      "A",
+      "detail",
+      "20",
+      "30"
+    ],
+    [
+      "South",
+      "A",
+      "detail",
+      "30",
+      "50"
+    ],
+    [
+      "All",
+      "A",
+      "total",
+      "50",
+      "80"
+    ]
+  ]
+}

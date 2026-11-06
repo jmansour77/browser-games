@@ -1,0 +1,8 @@
+{
+  "op": "lookup",
+  "select": {
+    "Area": "East",
+    "Category": "B",
+    "period": "2031"
+  }
+}

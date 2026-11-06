@@ -1,0 +1,168 @@
+{
+  "operation": "difference",
+  "result": "4.00",
+  "units": "demonstration units",
+  "definition": "left minus right",
+  "table_metadata": {
+    "document_id": "synthetic-heldout",
+    "table_id": "unseen-B",
+    "title": {
+      "en": "Synthetic activity counts",
+      "ar": "أعداد أنشطة افتراضية"
+    },
+    "description": {
+      "en": "synthetic demonstration only; not official NCSI statistics"
+    },
+    "evidence_kind": "synthetic demonstration only",
+    "units": "demonstration units",
+    "measure": "activity",
+    "notes": [
+      "All values and dimension members are synthetic."
+    ],
+    "source": {
+      "uri": "synthetic:synthetic-heldout",
+      "sheet": "Demo",
+      "start_row": 1,
+      "start_column": 1
+    }
+  },
+  "evidence": [
+    {
+      "dimensions": {
+        "Area": "East",
+        "Category": "B"
+      },
+      "period": "2031",
+      "measure": "activity",
+      "unit": "demonstration units",
+      "value": "14.25",
+      "value_type": "decimal_string",
+      "role": "detail",
+      "provenance": {
+        "input_file": "C:\\Users\\Jaffar.Mansour\\Desktop\\Claudecode\\MultiModelColPali\\ncsi_table_demo\\heldout_changed.json",
+        "input_sha256": "f107f82cffa5423f9ccd6ffaa4b3e07ef183525cfba2f806d4a43c7bda29968d",
+        "json_pointer": "/rows/0/4",
+        "header_pointer": "/headers/4",
+        "document_id": "synthetic-heldout",
+        "table_id": "unseen-B",
+        "source": {
+          "uri": "synthetic:synthetic-heldout",
+          "sheet": "Demo",
+          "start_row": 1,
+          "start_column": 1
+        },
+        "supplied_source_cell": {
+          "row": 2,
+          "column": 5
+        }
+      },
+      "dimension_provenance": {
+        "Area": {
+          "input_file": "C:\\Users\\Jaffar.Mansour\\Desktop\\Claudecode\\MultiModelColPali\\ncsi_table_demo\\heldout_changed.json",
+          "input_sha256": "f107f82cffa5423f9ccd6ffaa4b3e07ef183525cfba2f806d4a43c7bda29968d",
+          "json_pointer": "/rows/0/0",
+          "header_pointer": "/headers/0",
+          "document_id": "synthetic-heldout",
+          "table_id": "unseen-B",
+          "source": {
+            "uri": "synthetic:synthetic-heldout",
+            "sheet": "Demo",
+            "start_row": 1,
+            "start_column": 1
+          },
+          "supplied_source_cell": {
+            "row": 2,
+            "column": 1
+          }
+        },
+        "Category": {
+          "input_file": "C:\\Users\\Jaffar.Mansour\\Desktop\\Claudecode\\MultiModelColPali\\ncsi_table_demo\\heldout_changed.json",
+          "input_sha256": "f107f82cffa5423f9ccd6ffaa4b3e07ef183525cfba2f806d4a43c7bda29968d",
+          "json_pointer": "/rows/0/1",
+          "header_pointer": "/headers/1",
+          "document_id": "synthetic-heldout",
+          "table_id": "unseen-B",
+          "source": {
+            "uri": "synthetic:synthetic-heldout",
+            "sheet": "Demo",
+            "start_row": 1,
+            "start_column": 1
+          },
+          "supplied_source_cell": {
+            "row": 2,
+            "column": 2
+          }
+        }
+      }
+    },
+    {
+      "dimensions": {
+        "Area": "East",
+        "Category": "B"
+      },
+      "period": "2030",
+      "measure": "activity",
+      "unit": "demonstration units",
+      "value": "10.25",
+      "value_type": "decimal_string",
+      "role": "detail",
+      "provenance": {
+        "input_file": "C:\\Users\\Jaffar.Mansour\\Desktop\\Claudecode\\MultiModelColPali\\ncsi_table_demo\\heldout_changed.json",
+        "input_sha256": "f107f82cffa5423f9ccd6ffaa4b3e07ef183525cfba2f806d4a43c7bda29968d",
+        "json_pointer": "/rows/0/3",
+        "header_pointer": "/headers/3",
+        "document_id": "synthetic-heldout",
+        "table_id": "unseen-B",
+        "source": {
+          "uri": "synthetic:synthetic-heldout",
+          "sheet": "Demo",
+          "start_row": 1,
+          "start_column": 1
+        },
+        "supplied_source_cell": {
+          "row": 2,
+          "column": 4
+        }
+      },
+      "dimension_provenance": {
+        "Area": {
+          "input_file": "C:\\Users\\Jaffar.Mansour\\Desktop\\Claudecode\\MultiModelColPali\\ncsi_table_demo\\heldout_changed.json",
+          "input_sha256": "f107f82cffa5423f9ccd6ffaa4b3e07ef183525cfba2f806d4a43c7bda29968d",
+          "json_pointer": "/rows/0/0",
+          "header_pointer": "/headers/0",
+          "document_id": "synthetic-heldout",
+          "table_id": "unseen-B",
+          "source": {
+            "uri": "synthetic:synthetic-heldout",
+            "sheet": "Demo",
+            "start_row": 1,
+            "start_column": 1
+          },
+          "supplied_source_cell": {
+            "row": 2,
+            "column": 1
+          }
+        },
+        "Category": {
+          "input_file": "C:\\Users\\Jaffar.Mansour\\Desktop\\Claudecode\\MultiModelColPali\\ncsi_table_demo\\heldout_changed.json",
+          "input_sha256": "f107f82cffa5423f9ccd6ffaa4b3e07ef183525cfba2f806d4a43c7bda29968d",
+          "json_pointer": "/rows/0/1",
+          "header_pointer": "/headers/1",
+          "document_id": "synthetic-heldout",
+          "table_id": "unseen-B",
+          "source": {
+            "uri": "synthetic:synthetic-heldout",
+            "sheet": "Demo",
+            "start_row": 1,
+            "start_column": 1
+          },
+          "supplied_source_cell": {
+            "row": 2,
+            "column": 2
+          }
+        }
+      }
+    }
+  ],
+  "review_status": "validated_structure"
+}

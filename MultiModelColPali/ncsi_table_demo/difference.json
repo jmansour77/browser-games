@@ -1,0 +1,13 @@
+{
+  "op": "difference",
+  "left": {
+    "Area": "East",
+    "Category": "B",
+    "period": "2031"
+  },
+  "right": {
+    "Area": "East",
+    "Category": "B",
+    "period": "2030"
+  }
+}
